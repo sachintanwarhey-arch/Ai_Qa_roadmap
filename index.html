@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Quality Engineer — Learning Eval Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F4F6F2;
+    --card:#FFFFFF;
+    --ink:#17231E;
+    --muted:#5C6B63;
+    --line:#DDE4DC;
+    --pass:#157F4E;
+    --pass-soft:#E3F2E9;
+    --master:#B3361E;
+    --master-soft:#FBEAE5;
+    --work:#96660A;
+    --work-soft:#FBF1DC;
+    --aware:#5C6B63;
+    --aware-soft:#EDF0EC;
+    --focus:#0E5FD8;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --sans:'IBM Plex Sans',system-ui,sans-serif;
+    --disp:'Space Grotesk',var(--sans);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.55;padding-bottom:80px}
+  a{color:var(--focus)}
+  .wrap{max-width:880px;margin:0 auto;padding:0 20px}
+
+  /* ---------- header: the pytest summary line ---------- */
+  header{border-bottom:1px solid var(--line);background:var(--card);position:sticky;top:0;z-index:10}
+  .hd-top{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0 6px;flex-wrap:wrap}
+  .hd-top h1{font-family:var(--disp);font-weight:700;font-size:clamp(1.15rem,3.5vw,1.6rem);letter-spacing:-.01em}
+  .hd-top h1 span{color:var(--pass)}
+  .hd-meta{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+  .summaryline{font-family:var(--mono);font-size:clamp(.72rem,2.4vw,.85rem);padding:8px 0 4px;white-space:nowrap;overflow-x:auto}
+  .summaryline .p{color:var(--pass);font-weight:600}
+  .summaryline .r{color:var(--muted)}
+  .bar{height:8px;background:var(--aware-soft);border-radius:4px;overflow:hidden;margin:6px 0 16px}
+  .bar>div{height:100%;width:0%;background:var(--pass);border-radius:4px;transition:width .35s ease}
+
+  /* ---------- legend + controls ---------- */
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:20px 0 8px}
+  .tag{font-family:var(--mono);font-size:.66rem;font-weight:600;letter-spacing:.05em;padding:2px 8px;border-radius:3px}
+  .tag.M{background:var(--master-soft);color:var(--master)}
+  .tag.W{background:var(--work-soft);color:var(--work)}
+  .tag.A{background:var(--aware-soft);color:var(--aware)}
+  .toolbar .hint{font-size:.78rem;color:var(--muted)}
+  .toolbar .spacer{flex:1}
+  button.ghost{font-family:var(--mono);font-size:.72rem;background:none;border:1px solid var(--line);border-radius:5px;padding:6px 12px;cursor:pointer;color:var(--muted)}
+  button.ghost:hover{border-color:var(--muted);color:var(--ink)}
+  button:focus-visible,input:focus-visible,.phase-head:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+  #storagenote{display:none;font-family:var(--mono);font-size:.7rem;color:var(--work);background:var(--work-soft);border-radius:5px;padding:8px 12px;margin-top:10px}
+
+  /* ---------- phases ---------- */
+  .phase{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-top:16px;overflow:hidden}
+  .phase.core{border-color:var(--pass)}
+  .phase-head{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:none;padding:14px 16px;cursor:pointer;font-family:inherit}
+  .ph-id{font-family:var(--mono);font-size:.68rem;color:var(--muted);min-width:52px}
+  .ph-title{font-family:var(--disp);font-weight:700;font-size:1rem;flex:1}
+  .ph-title small{display:block;font-family:var(--mono);font-weight:400;font-size:.68rem;color:var(--muted);margin-top:2px}
+  .ph-count{font-family:var(--mono);font-size:.72rem;color:var(--muted);white-space:nowrap}
+  .ph-count.done{color:var(--pass);font-weight:600}
+  .chev{color:var(--muted);transition:transform .2s;font-size:.7rem}
+  .phase.open .chev{transform:rotate(90deg)}
+  .phase-body{display:none;border-top:1px solid var(--line)}
+  .phase.open .phase-body{display:block}
+  .ph-note{font-size:.8rem;color:var(--muted);padding:12px 16px 0}
+
+  .topic{display:flex;align-items:flex-start;gap:12px;padding:11px 16px;border-bottom:1px solid var(--line)}
+  .topic:last-of-type{border-bottom:none}
+  .topic input{margin-top:3px;width:17px;height:17px;accent-color:var(--pass);cursor:pointer;flex-shrink:0}
+  .topic label{flex:1;font-size:.88rem;cursor:pointer}
+  .topic.checked label{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line);text-decoration-thickness:1.5px}
+  .topic .status{font-family:var(--mono);font-size:.62rem;font-weight:600;letter-spacing:.06em;color:var(--pass);min-width:38px;text-align:right;opacity:0;margin-top:4px}
+  .topic.checked .status{opacity:1}
+
+  .project{margin:12px 16px 16px;padding:12px 14px;background:var(--pass-soft);border-radius:8px;font-size:.84rem}
+  .project b{font-family:var(--mono);font-size:.68rem;letter-spacing:.06em;color:var(--pass);display:block;margin-bottom:4px}
+
+  /* ---------- rules footer ---------- */
+  .rules{margin-top:28px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+  .rules h2{font-family:var(--disp);font-size:.95rem;margin-bottom:10px}
+  .rules ol{padding-left:20px;font-size:.85rem;color:var(--muted)}
+  .rules li{margin-bottom:6px}
+  footer{margin-top:26px;text-align:center;font-family:var(--mono);font-size:.68rem;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="hd-top">
+      <h1>AI Quality Engineer <span>// learning eval suite</span></h1>
+      <div class="hd-meta">12-month plan · ~8–10 hrs/week</div>
+    </div>
+    <div class="summaryline" id="summaryline"></div>
+    <div class="bar" aria-hidden="true"><div id="barfill"></div></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="toolbar">
+    <span class="tag M">MASTER</span>
+    <span class="tag W">WORKING</span>
+    <span class="tag A">AWARE</span>
+    <span class="hint">Tick a topic only when you can build or explain it.</span>
+    <span class="spacer"></span>
+    <button class="ghost" id="expandall">Expand all</button>
+    <button class="ghost" id="resetbtn">Reset progress</button>
+  </div>
+  <div id="storagenote">Progress saving isn’t available in this preview. Once this page is hosted on GitHub Pages (or opened as a local file), ticks are saved automatically in your browser.</div>
+
+  <div id="phases"></div>
+
+  <div class="rules">
+    <h2>Rules of the suite</h2>
+    <ol>
+      <li>A topic passes only when you can build or explain it — keep a proof snippet in your notes.</li>
+      <li>Max 3 topics in progress at once.</li>
+      <li>Every phase ends with its project pushed to GitHub.</li>
+      <li>Revisit anything you haven’t touched in 2 weeks — passing once isn’t passing forever.</li>
+    </ol>
+  </div>
+
+  <footer>progress is stored in this browser via localStorage · built for github pages</footer>
+</main>
+
+<script>
+const DATA = [
+ {id:"P0", title:"Foundation Check", weeks:"Weeks 1–2", note:"Mostly done from your existing SDET roadmap — verify, don’t relearn.", topics:[
+  ["Python: functions, OOP, decorators, generators, typing","M"],
+  ["Python: async/await basics","W"],
+  ["Pytest: fixtures, parametrize, markers, plugins","M"],
+  ["REST API testing (requests / httpx)","M"],
+  ["Git + GitHub Actions CI/CD","M"],
+  ["SQL: joins, aggregations, window function basics","W"],
+  ["JSON handling + pydantic models","M"]],
+  project:null},
+ {id:"P1", title:"Python for Data", weeks:"Weeks 3–5", note:"The single biggest gap between SDET-Python and AI-Python.", topics:[
+  ["pandas: DataFrames, filtering, groupby, merge, apply","M"],
+  ["pandas: reading/writing CSV, JSON, JSONL, Parquet","M"],
+  ["numpy: arrays and vectorized ops (basics)","W"],
+  ["matplotlib / plotly: bar, line, histogram charts","W"],
+  ["Jupyter notebook workflow","W"],
+  ["JSONL as the standard dataset format","M"]],
+  project:"Project 1 — Load a public dataset in pandas, clean it, compute stats, chart it in a notebook. Push to GitHub."},
+ {id:"P2", title:"LLM Fundamentals", weeks:"Weeks 5–8", note:"Understand what you’re testing. Conceptual, not math-heavy.", topics:[
+  ["How LLMs work: tokens, context window, next-token prediction","M"],
+  ["Temperature, top-p, max tokens — why outputs are non-deterministic","M"],
+  ["Embeddings: cosine similarity, semantic search","M"],
+  ["System vs user vs assistant turns","M"],
+  ["Fine-tuning vs RAG vs prompting — when each is used","W"],
+  ["Model families & tradeoffs (GPT, Claude, Gemini, Llama, open-source)","W"],
+  ["Context limits, truncation, “lost in the middle”","W"],
+  ["Tokenization quirks (why counting/spelling/math fail)","A"],
+  ["Transformer internals (awareness only — skip the math rabbit hole)","A"]],
+  project:null},
+ {id:"P3", title:"LLM APIs Hands-On", weeks:"Weeks 8–11", note:null, topics:[
+  ["OpenAI + Anthropic APIs: chat completions, roles, params","M"],
+  ["Structured outputs / JSON mode / response schemas","M"],
+  ["Function calling / tool use","M"],
+  ["Streaming responses","W"],
+  ["Error handling: rate limits, retries, backoff, timeouts","M"],
+  ["Cost management: token counting, batching, caching","W"],
+  ["Multimodal inputs (images, PDFs)","A"],
+  ["Local models via Ollama","W"]],
+  project:"Project 2 — CLI tool that sends one prompt to 2–3 models, compares outputs, logs cost + latency. Your first eval-shaped repo."},
+ {id:"P4", title:"Prompt Engineering & Prompt Testing", weeks:"Weeks 11–14", note:"Where your QA instincts start paying off.", topics:[
+  ["Few-shot, chain-of-thought, role prompting","M"],
+  ["Prompt versioning & regression testing","M"],
+  ["Output validation: format checks, schemas, guardrails","M"],
+  ["Prompt injection basics (as a failure mode)","W"],
+  ["Prompt templates & variable substitution","W"],
+  ["Managing prompts like code: files, reviews, CI","M"]],
+  project:"Project 3 — Prompt regression suite: 5 prompts × 20 inputs, runs in pytest on every commit, build fails if quality drops."},
+ {id:"P5", title:"Evaluation Fundamentals", weeks:"Weeks 14–18", core:true, note:"⭐ The core phase — this is the job. Go deepest here; never compress it.", topics:[
+  ["Golden datasets: building, sizing, maintaining test sets","M"],
+  ["Exact-match, regex, rule-based metrics","M"],
+  ["Classification metrics: accuracy, precision, recall, F1, confusion matrix","M"],
+  ["Semantic similarity scoring (embedding-based)","M"],
+  ["LLM-as-judge: rubrics, pairwise comparison, judge biases (position, verbosity, self-preference)","M"],
+  ["Human eval: annotation guidelines, inter-rater agreement (Cohen’s kappa)","W"],
+  ["Statistical thinking: sample size, run-to-run variance, when a difference is real","M"],
+  ["BLEU / ROUGE — and why they’re mostly outdated for LLMs","A"],
+  ["Regression vs capability evals; offline vs online","M"],
+  ["Pass@k, majority voting, N samples per input","W"]],
+  project:"Project 4 (portfolio centerpiece) — Full eval pipeline: 100-example golden set → automated metrics + LLM-as-judge → results dashboard → runs in GitHub Actions → README explaining methodology."},
+ {id:"P6", title:"Eval Frameworks & Tooling", weeks:"Weeks 18–21", note:"Learn two deeply, stay aware of the rest.", topics:[
+  ["promptfoo (config-driven, CI-friendly)","M"],
+  ["DeepEval (pytest-native — natural fit for you)","M"],
+  ["Ragas (RAG-specific metrics)","W"],
+  ["LangSmith / Braintrust / Langfuse (pick one hosted platform)","W"],
+  ["OpenAI Evals / lm-evaluation-harness","A"],
+  ["Public benchmarks: MMLU, HumanEval, SWE-bench — what they measure, their limits","A"]],
+  project:"Project 5 — Re-implement Project 4 in promptfoo or DeepEval; write a “hand-rolled vs framework” comparison post."},
+ {id:"P7", title:"RAG Testing", weeks:"Weeks 21–24", note:"Most enterprise LLM apps are RAG apps; testing them is a distinct skill.", topics:[
+  ["RAG architecture: chunking, embeddings, vector DB, retrieval, generation","M"],
+  ["Retrieval metrics: recall@k, precision@k, MRR","M"],
+  ["Generation metrics: faithfulness/groundedness, answer relevance, context precision","M"],
+  ["Testing chunking strategies & embedding choices","W"],
+  ["Vector DB hands-on (Chroma or pgvector — one is enough)","W"],
+  ["Hallucination detection in RAG (answers unsupported by context)","M"]],
+  project:"Project 6 — Small RAG app over some docs + the eval suite that catches its hallucinations. The eval matters more than the app."},
+ {id:"P8", title:"Agent & Multi-Turn Testing", weeks:"Weeks 24–27", note:"The frontier — least competition, fastest-growing demand.", topics:[
+  ["Agent architectures: tool loops, planning, memory","W"],
+  ["Trajectory evaluation: were the steps reasonable, not just the answer?","M"],
+  ["Tool-call correctness: right tool, right args, right order","M"],
+  ["Multi-turn conversation testing & simulated users","M"],
+  ["Sandboxing / safe execution for agent tests","W"],
+  ["Cost & latency budgets for agent runs","W"]],
+  project:"Project 7 — Test harness for a simple tool-using agent: assert on tool-call sequences and final answers across 30 scenarios."},
+ {id:"P9", title:"Safety, Red-Teaming & Responsible AI", weeks:"Weeks 27–30", note:null, topics:[
+  ["Hallucination taxonomy & detection strategies","M"],
+  ["Prompt injection & jailbreak testing (defensively, on your own app)","M"],
+  ["Bias & fairness testing basics","W"],
+  ["PII leakage testing","W"],
+  ["Guardrails: input/output filtering, moderation APIs","W"],
+  ["Adversarial test-set design — your exploratory-testing skills, weaponized","M"],
+  ["AI regulation awareness (EU AI Act etc.)","A"]],
+  project:"Project 8 — Red-team report: attack one of your earlier projects systematically, document findings like a pentest report."},
+ {id:"P10", title:"Data Quality & Dataset Engineering", weeks:"Weeks 30–33", note:null, topics:[
+  ["Building datasets from production logs & failures","M"],
+  ["Synthetic data generation with LLMs (and its pitfalls)","W"],
+  ["Labeling workflows & annotation tools","W"],
+  ["Dataset versioning (git + JSONL discipline is enough)","M"],
+  ["Data contamination: keeping test sets out of training/few-shot data","W"],
+  ["Class balance, coverage analysis, slicing results by category","M"]],
+  project:null},
+ {id:"P11", title:"Production Monitoring & Observability", weeks:"Weeks 33–36", note:null, topics:[
+  ["Tracing LLM apps (Langfuse/LangSmith traces & spans)","M"],
+  ["Online evals: scoring live traffic samples","W"],
+  ["Drift detection: model updates silently changing behavior","W"],
+  ["User feedback loops: thumbs-down → new eval cases","M"],
+  ["Alerting on quality regressions","W"],
+  ["A/B testing prompts & models in production","A"]],
+  project:"Project 9 — Add Langfuse tracing to an earlier project; build a “failed traces → new test cases” loop."},
+ {id:"P12", title:"ML Basics (parallel track)", weeks:"~1 hr/week throughout", note:"Only enough to be credible — you are not becoming a data scientist.", topics:[
+  ["Train/validation/test splits, overfitting","W"],
+  ["Supervised vs unsupervised; classification vs regression","W"],
+  ["How fine-tuning works conceptually (LoRA at awareness level)","A"],
+  ["scikit-learn: train one classifier once, evaluate it","A"]],
+  project:null},
+ {id:"P13", title:"Portfolio, Positioning & Job Hunt", weeks:"Weeks 36–48 (start applying in month 10)", note:"Position as “Senior SDET with GenAI/LLM evaluation skills” for the Indian market; pure eval titles for remote international roles.", topics:[
+  ["GitHub: 4–5 polished repos (Projects 2, 4, 6, 7, 8 strongest) with methodology READMEs","M"],
+  ["2–3 blog posts / LinkedIn write-ups for visibility","W"],
+  ["Retitle: “AI Quality Engineer / LLM Evaluation”, not “QA Engineer”","M"],
+  ["Search terms: SDET GenAI, LLM testing, RAG evaluation, AI validation","M"],
+  ["Interview prep: judge biases, whiteboard an eval design, testing non-determinism","M"],
+  ["Salary anchoring: ML-adjacent bands, not QA bands","W"]],
+  project:null}
+];
+
+const LABEL = {M:"MASTER", W:"WORKING", A:"AWARE"};
+const KEY = "aiqe-progress-v1";
+const OPENKEY = "aiqe-open-v1";
+
+let mem = {};            // in-memory fallback
+let canStore = true;
+function load(k){ try{ return JSON.parse(localStorage.getItem(k)||"{}"); }catch(e){ canStore=false; return mem[k]||{}; } }
+function save(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){ canStore=false; mem[k]=v; document.getElementById("storagenote").style.display="block"; } }
+
+let progress = load(KEY);
+let openState = load(OPENKEY);
+
+const root = document.getElementById("phases");
+DATA.forEach((ph,pi)=>{
+  const el = document.createElement("section");
+  el.className = "phase" + (ph.core ? " core":"");
+  el.id = ph.id;
+
+  const head = document.createElement("button");
+  head.className = "phase-head";
+  head.setAttribute("aria-expanded","false");
+  head.innerHTML = `<span class="ph-id">${ph.id}</span>
+    <span class="ph-title">${ph.title}<small>${ph.weeks}</small></span>
+    <span class="ph-count" id="cnt-${ph.id}"></span>
+    <span class="chev">▶</span>`;
+  head.addEventListener("click", ()=>{
+    el.classList.toggle("open");
+    const open = el.classList.contains("open");
+    head.setAttribute("aria-expanded", open);
+    openState[ph.id] = open; save(OPENKEY, openState);
+  });
+  el.appendChild(head);
+
+  const body = document.createElement("div");
+  body.className = "phase-body";
+  if(ph.note){ const n=document.createElement("p"); n.className="ph-note"; n.textContent=ph.note; body.appendChild(n); }
+
+  ph.topics.forEach((t,ti)=>{
+    const id = `${ph.id}-t${ti}`;
+    const row = document.createElement("div");
+    row.className = "topic" + (progress[id] ? " checked":"");
+    row.innerHTML = `<input type="checkbox" id="${id}" ${progress[id]?"checked":""}>
+      <label for="${id}">${t[0]} <span class="tag ${t[1]}">${LABEL[t[1]]}</span></label>
+      <span class="status">PASS</span>`;
+    row.querySelector("input").addEventListener("change", e=>{
+      progress[id] = e.target.checked;
+      if(!e.target.checked) delete progress[id];
+      row.classList.toggle("checked", e.target.checked);
+      save(KEY, progress);
+      refresh();
+    });
+    body.appendChild(row);
+  });
+
+  if(ph.project){
+    const pr = document.createElement("div");
+    pr.className = "project";
+    const [b, ...rest] = ph.project.split(" — ");
+    pr.innerHTML = `<b>${b}</b>${rest.join(" — ")}`;
+    body.appendChild(pr);
+  }
+
+  el.appendChild(body);
+  root.appendChild(el);
+  if(openState[ph.id] || (pi===0 && openState[ph.id]===undefined)) { el.classList.add("open"); head.setAttribute("aria-expanded","true"); }
+});
+
+function refresh(){
+  let total=0, done=0;
+  DATA.forEach(ph=>{
+    let t=ph.topics.length, d=0;
+    ph.topics.forEach((_,ti)=>{ total++; if(progress[`${ph.id}-t${ti}`]){ d++; done++; } });
+    const c = document.getElementById(`cnt-${ph.id}`);
+    c.textContent = `${d}/${t}`;
+    c.classList.toggle("done", d===t);
+  });
+  const pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById("summaryline").innerHTML =
+    `======== <span class="p">${done} passed</span>, <span class="r">${total-done} remaining</span> — ${pct}% of suite ========`;
+  document.getElementById("barfill").style.width = pct + "%";
+}
+refresh();
+
+document.getElementById("resetbtn").addEventListener("click", ()=>{
+  if(confirm("Reset all progress? This clears every tick.")){
+    progress = {}; save(KEY, progress);
+    document.querySelectorAll(".topic input").forEach(i=>{ i.checked=false; i.closest(".topic").classList.remove("checked"); });
+    refresh();
+  }
+});
+let allOpen=false;
+document.getElementById("expandall").addEventListener("click", e=>{
+  allOpen = !allOpen;
+  document.querySelectorAll(".phase").forEach(p=>{
+    p.classList.toggle("open", allOpen);
+    p.querySelector(".phase-head").setAttribute("aria-expanded", allOpen);
+    openState[p.id]=allOpen;
+  });
+  save(OPENKEY, openState);
+  e.target.textContent = allOpen ? "Collapse all" : "Expand all";
+});
+// show fallback note if storage failed on first load
+try{ localStorage.setItem("__t","1"); localStorage.removeItem("__t"); }
+catch(e){ document.getElementById("storagenote").style.display="block"; }
+</script>
+</body>
+</html>
